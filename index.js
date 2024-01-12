@@ -19,33 +19,29 @@ class App {
     );
 
     const { data } = await response.json();
-    data.list[0].data.data.forEach(async ({ app }) => {
-      const header = {
-        link: `${this.#BASE_URL}/app/${app.id}`,
-        domain: "string",
-        tag: ["string"],
-        crawling_time: strftime("%Y-%m-%d %H:%M:%S", new Date()),
-        crawling_time_epoch: Date.now(),
-        path_data_raw: "string",
-        path_data_clean: "string",
-        reviews_name: "string",
-        location_reviews: "string",
-        category_reviews: "string",
-        total_reviews: "integer",
-        title: app.title,
-        rating: parseFloat(app.stat.rating.score),
-        tags: app.tags.map((tag) => tag.value),
-        developers: app.developers.map((developer) => developer.name),
-      };
+    data.list[0].data.data.forEach(async (data) => {
+      const response = await fetch(
+        `${this.#BASE_URL}/webapiv2/i/app/v5/detail?` +
+          new URLSearchParams({
+            id: data.app.id,
+            "X-UA": this.#xua,
+          })
+      );
+
+      const content = await response.json();
+      const { app } = content.data;
 
       let i = 0;
-
       while (true) {
-        const { data } = await this.#requestReview({
+        const data = await this.#requestReview({
           app_id: app.id,
           from: i,
           limit: 100,
         });
+
+        console.log(data);
+
+        return;
 
         const reviews = data.list;
 
@@ -58,25 +54,59 @@ class App {
           const app_ratings = post.list_fields.app_ratings
             ? post.list_fields.app_ratings
             : null;
+          const stat = !Object.keys(post.stat).length ? null : post.stat;
+
           const outputFile = `data/${app.title}/${username}.json`;
 
           this.writeFile(outputFile, {
-            ...header,
-            username,
-            published_time: post.published_time,
-            edited_time: post.edited_time,
-            user_rating: app_ratings ? app_ratings[app.id].score : null,
-            sub_items: app_ratings ? app_ratings[app.id].sub_items : null,
-            comment_title:
-              post.sharing.title === "Untitled Post"
-                ? null
-                : post.sharing.title,
-            comment_desc: post.sharing.description,
-            stat: !Object.keys(post.stat).length ? null : post.stat,
+            link: `${this.#BASE_URL}/app/${app.id}`,
+            domain: this.#BASE_URL.split("/")[2],
+            tag: `${this.#BASE_URL}/app/${app.id}`.replace("/").slice(2),
             crawling_time: strftime("%Y-%m-%d %H:%M:%S", new Date()),
             crawling_time_epoch: Date.now(),
             path_data_raw: `data/data_raw/data_review/www.taptap.io/${app.title}/json/${username}.json`,
             path_data_clean: `data/data_clean/data_review/www.taptap.io/${app.title}/json/${username}.json`,
+            reviews_name: app.title,
+            developers: app.developers.map((developer) => developer.name),
+            location_reviews: null,
+            category_reviews: "application",
+            total_reviews: app.stat.review_count,
+            reviews_rating: {
+              total_rating: parseFloat(app.stat.rating.score),
+              detail_total_rating: null,
+            },
+            detail_reviews: {
+              username_reviews: username,
+              gender_reviews: !post.user.gender.length
+                ? post.user.gender
+                : null,
+              avatar_reviews: post.user.avatar,
+              image_reviews: "string",
+              created_time: post.published_time,
+              created_time_epoch: post.published_time,
+              edited_time: post.edited_time,
+              edited_time_epoch: post.edited_time,
+              email_reviews: null,
+              company_name: null,
+              location_reviews: null,
+              title_detail_reviews:
+                post.sharing.title === "Untitled Post"
+                  ? null
+                  : post.sharing.title,
+              reviews_rating: app_ratings ? app_ratings[app.id].score : null,
+              detail_reviews_rating: null,
+              total_likes_reviews: stat ? stat.ups : null,
+              total_dislikes_reviews: null,
+              total_reply_reviews: stat ? stat.comments : null,
+              total_favorites_reviews: stat ? stat.comments : null,
+              content_reviews: post.sharing.description,
+              reply_content_reviews: {
+                username_reply_reviews: "string",
+                content_reviews: "string",
+              },
+              date_of_experience: null,
+              date_of_experience_epoch: null,
+            },
           });
           console.log(outputFile);
         });
@@ -98,15 +128,33 @@ class App {
    * @param {string} limit
    * @returns
    */
-  async #requestReview(data) {
+  async #requestReview(params) {
     const response = await fetch(
       `${this.#BASE_URL}/webapiv2/feeds/v1/app-ratings?` +
         new URLSearchParams({
-          ...data,
+          ...params,
           "X-UA": this.#xua,
         })
     );
-    return await response.json();
+
+    const { data } = await response.json();
+
+    const reviews = data.list;
+
+    if (!reviews) return;
+
+    return reviews.map(async ({ post }) => {
+      const response = await fetch(
+        `${this.#BASE_URL}/webapiv2/creation/post/v1/detail?` +
+          new URLSearchParams({
+            id_str: post.id_str,
+            "X-UA": this.#xua,
+          })
+      );
+      const { data } = await response.json();
+
+      return data.post.id;
+    });
   }
 }
 
