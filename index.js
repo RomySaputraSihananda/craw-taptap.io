@@ -2,6 +2,7 @@ import fs from "fs-extra";
 import strftime from "strftime";
 
 class App {
+  #BASE_URL = "https://www.taptap.io";
   #xua =
     "V=1&PN=WebAppIntl2&LANG=en_US&VN_CODE=114&VN=0.1.0&LOC=CN&PLT=PC&DS=Android&UID=4df88e5d-b4f4-4173-8985-a83672c5d35a&CURR=ID&DT=PC&OS=Linux&OSV=x86_64";
   constructor() {
@@ -10,7 +11,7 @@ class App {
 
   async #start() {
     const response = await fetch(
-      "https://www.taptap.io/webapiv2/i/sidebar/v1/list?" +
+      `${this.#BASE_URL}/webapiv2/i/sidebar/v1/list?` +
         new URLSearchParams({
           type: "landing",
           "X-UA": this.#xua,
@@ -20,7 +21,17 @@ class App {
     const { data } = await response.json();
     data.list[0].data.data.forEach(async ({ app }) => {
       const header = {
-        app_id: app.id,
+        link: `${this.#BASE_URL}/app/${app.id}`,
+        domain: "string",
+        tag: ["string"],
+        crawling_time: strftime("%Y-%m-%d %H:%M:%S", new Date()),
+        crawling_time_epoch: Date.now(),
+        path_data_raw: "string",
+        path_data_clean: "string",
+        reviews_name: "string",
+        location_reviews: "string",
+        category_reviews: "string",
+        total_reviews: "integer",
         title: app.title,
         rating: parseFloat(app.stat.rating.score),
         tags: app.tags.map((tag) => tag.value),
@@ -70,6 +81,8 @@ class App {
           console.log(outputFile);
         });
 
+        break;
+
         i += 100;
       }
     });
@@ -87,7 +100,7 @@ class App {
    */
   async #requestReview(data) {
     const response = await fetch(
-      "https://www.taptap.io/webapiv2/feeds/v1/app-ratings?" +
+      `${this.#BASE_URL}/webapiv2/feeds/v1/app-ratings?` +
         new URLSearchParams({
           ...data,
           "X-UA": this.#xua,
