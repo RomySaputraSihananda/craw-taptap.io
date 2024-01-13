@@ -46,20 +46,19 @@ class App {
           const { data } = await response.json();
           const { post } = data;
 
-          delete post.stat.pv_total;
-
           const username = post.user.name.replace("/", "");
-          const app_ratings = post.list_fields.app_ratings
-            ? post.list_fields.app_ratings
-            : null;
           const stat = !Object.keys(post.stat).length ? null : post.stat;
+
+          const rating = postIn.list_fields.app_ratings
+            ? postIn.list_fields.app_ratings[app.id].score
+            : null;
 
           const outputFile = `data/${app.title}/${username}.json`;
 
           this.writeFile(outputFile, {
             link: `${this.#BASE_URL}/app/${app.id}`,
             domain: this.#BASE_URL.split("/")[2],
-            tag: `${this.#BASE_URL}/app/${app.id}`.replace("/").slice(2),
+            tag: `${this.#BASE_URL}/app/${app.id}`.split("/").slice(2),
             crawling_time: strftime("%Y-%m-%d %H:%M:%S", new Date()),
             crawling_time_epoch: Date.now(),
             path_data_raw: `data/data_raw/data_review/www.taptap.io/${app.title}/json/${username}.json`,
@@ -101,12 +100,12 @@ class App {
               company_name: null,
               location_reviews: null,
               title_detail_reviews: post.title,
-              reviews_rating: app_ratings ? app_ratings[app.id].score : null,
+              reviews_rating: rating,
               detail_reviews_rating: null,
-              total_likes_reviews: stat ? stat.ups : 0,
+              total_likes_reviews: stat ? stat.ups | 0 : 0,
               total_dislikes_reviews: null,
-              total_reply_reviews: stat ? stat.comments : 0,
-              total_favorites_reviews: stat ? stat.favorites : 0,
+              total_reply_reviews: stat ? stat.comments | 0 : 0,
+              total_favorites_reviews: stat ? stat.favorites | 0 : 0,
               content_reviews: post.contents.json
                 .filter((content) => content.type == "paragraph")
                 .map((content) => content.children.map((e) => e.text).join(""))
@@ -115,9 +114,6 @@ class App {
               reply_content_reviews: !(stat && stat.comments)
                 ? []
                 : await this.#getReplys({
-                    from: 0,
-                    limit: 10,
-                    // limit: stat.comments,
                     post_id_str: postIn.id_str,
                   }),
 
@@ -127,8 +123,8 @@ class App {
           });
           console.log(outputFile);
         }
-        break;
 
+        // break;
         i += 100;
       }
     });
@@ -139,24 +135,40 @@ class App {
   }
 
   async #getReplys(payload) {
-    const response = await fetch(
-      `${this.#BASE_URL}/webapiv2/creation/comment/v1/by-post?` +
-        new URLSearchParams({
-          ...payload,
-          "X-UA": this.#xua,
-        })
-    );
+    const replys = [];
+    let i = 0;
+    while (true) {
+      const response = await fetch(
+        `${this.#BASE_URL}/webapiv2/creation/comment/v1/by-post?` +
+          new URLSearchParams({
+            ...payload,
+            from: i,
+            limit: 10,
+            "X-UA": this.#xua,
+          })
+      );
+      const { data } = await response.json();
 
-    const { data } = await response.json();
-    return data.list.map((reply) => {
-      // return reply.user;
-      return {
+      if (!data.list) break;
+
+      replys.push(...data.list);
+      i += 10;
+    }
+
+    const result = [];
+    for (const reply of replys) {
+      result.push({
         username_reply_reviews: reply.user.name,
         content_reply_reviews: reply.contents.raw_text,
+        image_reply_reviews: reply.images
+          ? reply.images.map((image) => image.url)
+          : null,
         avatar_reply_reviews: reply.user.avatar,
         gender_reply_reviews: reply.user.gender.length
           ? reply.user.gender
           : null,
+        total_likes_reviews: reply.stat.ups,
+        total_reply_reviews: reply.stat.comments,
         created_time: strftime(
           "%Y-%m-%d %H:%M:%S",
           new Date(reply.created_time * 1000)
@@ -169,11 +181,13 @@ class App {
         edited_time_epoch: reply.edited_time,
         child_comments: !reply.child_comments
           ? null
-          : reply.child_comments.map((child_comment) =>
-              this.#parserUser(child_comment)
-            ),
-      };
-    });
+          : await this.#getChild({
+              id_str: reply.id,
+              limit: reply.stat.comments,
+            }),
+      });
+    }
+    return result;
   }
 
   async #getGame() {
@@ -201,14 +215,47 @@ class App {
     );
   }
 
+  async #getChild(payload) {
+    const response = await fetch(
+      `${this.#BASE_URL}/webapiv2/creation/comment/v1/by-comment?` +
+        new URLSearchParams({
+          ...payload,
+          from: 0,
+          "X-UA": this.#xua,
+        })
+    );
+    const { data } = await response.json();
+    try {
+      return data.list.map((reply) => this.#parserUser(reply));
+    } catch (e) {
+      return null;
+    }
+  }
+
   #parserUser(reply) {
     return {
       username_reply_reviews: reply.user.name,
       content_reply_reviews: reply.contents.raw_text,
+      image_reply_reviews: reply.images
+        ? reply.images.map((image) => image.url)
+        : null,
       avatar_reply_reviews: reply.user.avatar,
       gender_reply_reviews: reply.user.gender.length ? reply.user.gender : null,
+      total_likes_reviews: reply.stat.ups,
+      total_reply_reviews: reply.stat.comments,
       created_reply_time: reply.published_time,
       created_reply_time_epoch: reply.published_time,
+      created_time: strftime(
+        "%Y-%m-%d %H:%M:%S",
+        new Date(reply.created_time * 1000)
+      ),
+      created_time_epoch: reply.created_time,
+      edited_time: strftime(
+        "%Y-%m-%d %H:%M:%S",
+        new Date(reply.edited_time * 1000)
+      ),
+      edited_time_epoch: reply.edited_time,
+      a: reply.child_comments,
     };
   }
 
@@ -233,29 +280,3 @@ class App {
 }
 
 new App();
-
-// let i = 0;
-
-// while (true) {
-// const response = await fetch(
-//   "https://www.taptap.io/webapiv2/creation/post/v1/detail?" +
-//     new URLSearchParams({
-//       id_str: 6006747,
-//       "X-UA":
-//         "V=1&PN=WebAppIntl2&LANG=en_US&VN_CODE=114&VN=0.1.0&LOC=CN&PLT=PC&DS=Android&UID=4df88e5d-b4f4-4173-8985-a83672c5d35a&CURR=ID&DT=PC&OS=Linux&OSV=x86_64",
-//     })
-// );
-// const { data } = await response.json();
-
-// console.log(data);
-
-//   if (!reviews) break;
-
-//   data.list.forEach(async ({ post }, j) => {
-//     console.log(post);
-//     // const username = post.user ? post.user.name : null;
-//     // if (username) console.log(username);
-//   });
-//   break;
-//   i += 200;
-// }
