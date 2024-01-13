@@ -10,20 +10,13 @@ class App {
   }
 
   async #start() {
-    const response = await fetch(
-      `${this.#BASE_URL}/webapiv2/i/sidebar/v1/list?` +
-        new URLSearchParams({
-          type: "landing",
-          "X-UA": this.#xua,
-        })
-    );
+    const apps = await this.#getGame();
 
-    const { data } = await response.json();
-    data.list[0].data.data.forEach(async (data) => {
+    apps.forEach(async (data) => {
       const response = await fetch(
         `${this.#BASE_URL}/webapiv2/i/app/v5/detail?` +
           new URLSearchParams({
-            id: data.app.id,
+            id: data.id,
             "X-UA": this.#xua,
           })
       );
@@ -33,21 +26,26 @@ class App {
 
       let i = 0;
       while (true) {
-        const data = await this.#requestReview({
+        const reviews = await this.#requestReview({
           app_id: app.id,
           from: i,
           limit: 100,
         });
 
-        console.log(data);
-
-        return;
-
-        const reviews = data.list;
-
         if (!reviews) break;
 
-        reviews.forEach(async ({ post }) => {
+        for (const { post: postIn } of reviews) {
+          const response = await fetch(
+            `${this.#BASE_URL}/webapiv2/creation/post/v1/detail?` +
+              new URLSearchParams({
+                id_str: postIn.id_str,
+                "X-UA": this.#xua,
+              })
+          );
+
+          const { data } = await response.json();
+          const { post } = data;
+
           delete post.stat.pv_total;
 
           const username = post.user.name.replace("/", "");
@@ -67,50 +65,68 @@ class App {
             path_data_raw: `data/data_raw/data_review/www.taptap.io/${app.title}/json/${username}.json`,
             path_data_clean: `data/data_clean/data_review/www.taptap.io/${app.title}/json/${username}.json`,
             reviews_name: app.title,
-            developers: app.developers.map((developer) => developer.name),
+            description_reviews: app.description.text,
+            developers_reviews: app.developers.map(
+              (developer) => developer.name
+            ),
+            tags_reviews: app.tags.map((tag) => tag.value),
             location_reviews: null,
             category_reviews: "application",
             total_reviews: app.stat.review_count,
+            total_fans: app.stat.fans_count,
+            total_user_want: app.stat.user_want_count,
+            total_user_played: app.stat.user_played_count,
+            total_user_playing: app.stat.user_playing_count,
             reviews_rating: {
               total_rating: parseFloat(app.stat.rating.score),
               detail_total_rating: null,
             },
+            review_info: app.stat.vote_info,
             detail_reviews: {
               username_reviews: username,
-              gender_reviews: !post.user.gender.length
-                ? post.user.gender
-                : null,
+              gender_reviews: post.user.gender.length ? post.user.gender : null,
               avatar_reviews: post.user.avatar,
-              image_reviews: "string",
-              created_time: post.published_time,
+              image_reviews: Object.keys(post.files.images),
+              created_time: strftime(
+                "%Y-%m-%d %H:%M:%S",
+                new Date(post.published_time * 1000)
+              ),
               created_time_epoch: post.published_time,
-              edited_time: post.edited_time,
+              edited_time: strftime(
+                "%Y-%m-%d %H:%M:%S",
+                new Date(post.edited_time * 1000)
+              ),
               edited_time_epoch: post.edited_time,
               email_reviews: null,
               company_name: null,
               location_reviews: null,
-              title_detail_reviews:
-                post.sharing.title === "Untitled Post"
-                  ? null
-                  : post.sharing.title,
+              title_detail_reviews: post.title,
               reviews_rating: app_ratings ? app_ratings[app.id].score : null,
               detail_reviews_rating: null,
-              total_likes_reviews: stat ? stat.ups : null,
+              total_likes_reviews: stat ? stat.ups : 0,
               total_dislikes_reviews: null,
-              total_reply_reviews: stat ? stat.comments : null,
-              total_favorites_reviews: stat ? stat.comments : null,
-              content_reviews: post.sharing.description,
-              reply_content_reviews: {
-                username_reply_reviews: "string",
-                content_reviews: "string",
-              },
+              total_reply_reviews: stat ? stat.comments : 0,
+              total_favorites_reviews: stat ? stat.favorites : 0,
+              content_reviews: post.contents.json
+                .filter((content) => content.type == "paragraph")
+                .map((content) => content.children.map((e) => e.text).join(""))
+                .filter((e) => e != "")
+                .join("\n"),
+              reply_content_reviews: !(stat && stat.comments)
+                ? []
+                : await this.#getReplys({
+                    from: 0,
+                    limit: 10,
+                    // limit: stat.comments,
+                    post_id_str: postIn.id_str,
+                  }),
+
               date_of_experience: null,
               date_of_experience_epoch: null,
             },
           });
           console.log(outputFile);
-        });
-
+        }
         break;
 
         i += 100;
@@ -120,6 +136,80 @@ class App {
 
   async writeFile(outputFile, data) {
     await fs.outputFile(outputFile, JSON.stringify(data, null, 2));
+  }
+
+  async #getReplys(payload) {
+    const response = await fetch(
+      `${this.#BASE_URL}/webapiv2/creation/comment/v1/by-post?` +
+        new URLSearchParams({
+          ...payload,
+          "X-UA": this.#xua,
+        })
+    );
+
+    const { data } = await response.json();
+    return data.list.map((reply) => {
+      // return reply.user;
+      return {
+        username_reply_reviews: reply.user.name,
+        content_reply_reviews: reply.contents.raw_text,
+        avatar_reply_reviews: reply.user.avatar,
+        gender_reply_reviews: reply.user.gender.length
+          ? reply.user.gender
+          : null,
+        created_time: strftime(
+          "%Y-%m-%d %H:%M:%S",
+          new Date(reply.created_time * 1000)
+        ),
+        created_time_epoch: reply.created_time,
+        edited_time: strftime(
+          "%Y-%m-%d %H:%M:%S",
+          new Date(reply.edited_time * 1000)
+        ),
+        edited_time_epoch: reply.edited_time,
+        child_comments: !reply.child_comments
+          ? null
+          : reply.child_comments.map((child_comment) =>
+              this.#parserUser(child_comment)
+            ),
+      };
+    });
+  }
+
+  async #getGame() {
+    const response = await fetch(
+      `${this.#BASE_URL}/webapiv2/i/sidebar/v1/list?` +
+        new URLSearchParams({
+          type: "landing",
+          "X-UA": this.#xua,
+        })
+    );
+
+    const { data } = await response.json();
+    return await Promise.all(
+      data.list[0].data.data.map(async (data) => {
+        const response = await fetch(
+          `${this.#BASE_URL}/webapiv2/i/app/v5/detail?` +
+            new URLSearchParams({
+              id: data.app.id,
+              "X-UA": this.#xua,
+            })
+        );
+        const content = await response.json();
+        return content.data.app;
+      })
+    );
+  }
+
+  #parserUser(reply) {
+    return {
+      username_reply_reviews: reply.user.name,
+      content_reply_reviews: reply.contents.raw_text,
+      avatar_reply_reviews: reply.user.avatar,
+      gender_reply_reviews: reply.user.gender.length ? reply.user.gender : null,
+      created_reply_time: reply.published_time,
+      created_reply_time_epoch: reply.published_time,
+    };
   }
 
   /**
@@ -138,23 +228,7 @@ class App {
     );
 
     const { data } = await response.json();
-
-    const reviews = data.list;
-
-    if (!reviews) return;
-
-    return reviews.map(async ({ post }) => {
-      const response = await fetch(
-        `${this.#BASE_URL}/webapiv2/creation/post/v1/detail?` +
-          new URLSearchParams({
-            id_str: post.id_str,
-            "X-UA": this.#xua,
-          })
-      );
-      const { data } = await response.json();
-
-      return data.post.id;
-    });
+    return data.list;
   }
 }
 
@@ -163,19 +237,17 @@ new App();
 // let i = 0;
 
 // while (true) {
-//   const response = await fetch(
-//     "https://www.taptap.io/webapiv2/feeds/v1/app-ratings?" +
-//       new URLSearchParams({
-//         app_id: 224745,
-//         from: i,
-//         limit: 120,
-//         session_id: "70e40c5f-a81f-4dc9-b53e-6ac30b4107d1",
-//         "X-UA":
-//           "V=1&PN=WebAppIntl2&LANG=en_US&VN_CODE=114&VN=0.1.0&LOC=CN&PLT=PC&DS=Android&UID=4df88e5d-b4f4-4173-8985-a83672c5d35a&CURR=ID&DT=PC&OS=Linux&OSV=x86_64",
-//       })
-//   );
-//   const { data } = await response.json();
-//   const reviews = data.list;
+// const response = await fetch(
+//   "https://www.taptap.io/webapiv2/creation/post/v1/detail?" +
+//     new URLSearchParams({
+//       id_str: 6006747,
+//       "X-UA":
+//         "V=1&PN=WebAppIntl2&LANG=en_US&VN_CODE=114&VN=0.1.0&LOC=CN&PLT=PC&DS=Android&UID=4df88e5d-b4f4-4173-8985-a83672c5d35a&CURR=ID&DT=PC&OS=Linux&OSV=x86_64",
+//     })
+// );
+// const { data } = await response.json();
+
+// console.log(data);
 
 //   if (!reviews) break;
 
