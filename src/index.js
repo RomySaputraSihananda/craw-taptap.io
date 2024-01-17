@@ -5,18 +5,46 @@ class Taptap {
   #BASE_URL = "https://www.taptap.io";
   #xua =
     "V=1&PN=WebAppIntl2&LANG=en_US&VN_CODE=114&VN=0.1.0&LOC=CN&PLT=PC&DS=Android&UID=4df88e5d-b4f4-4173-8985-a83672c5d35a&CURR=ID&DT=PC&OS=Linux&OSV=x86_64";
-  #gameId;
+  #platforms = ["android", "ios", "pc"];
 
-  constructor(gameId) {
-    this.#gameId = gameId;
+  constructor() {
     this.#start();
   }
 
   async #start() {
+    for (const platform of this.#platforms) {
+      let i = 0;
+      while (true) {
+        const requests = await fetch(
+          "https://www.taptap.io/webapiv2/i/app-top/v2/hits?" +
+            new URLSearchParams({
+              from: i,
+              limit: 20,
+              platform,
+              type_name: "hot",
+              "X-UA":
+                "V=1&PN=WebAppIntl2&LANG=en_US&VN_CODE=114&VN=0.1.0&LOC=CN&PLT=PC&DS=Android&UID=4df88e5d-b4f4-4173-8985-a83672c5d35a&CURR=ID&DT=PC&OS=Linux&OSV=x86_64",
+            })
+        );
+
+        const { data } = await requests.json();
+
+        for (const { app } of data.list) {
+          await this.#process(app.id);
+          // console.log(app.id);
+        }
+
+        if (!data.next_page.length) break;
+        i += 20;
+      }
+    }
+  }
+
+  async #process(gameId) {
     const response = await fetch(
       `${this.#BASE_URL}/webapiv2/i/app/v5/detail?` +
         new URLSearchParams({
-          id: this.#gameId,
+          id: gameId,
           "X-UA": this.#xua,
         })
     );
@@ -48,10 +76,14 @@ class Taptap {
 
         const username = post.user.name.replace("/", "");
         const stat = !Object.keys(post.stat).length ? null : post.stat;
-
-        const rating = postIn.list_fields.app_ratings
-          ? postIn.list_fields.app_ratings[app.id].score
-          : null;
+        let rating;
+        try {
+          rating = postIn.list_fields.app_ratings
+            ? postIn.list_fields.app_ratings[app.id].score
+            : null;
+        } catch (e) {
+          console.log(postIn.list_fields.app_ratings);
+        }
 
         const outputFile = `data/${app.title}/${username}.json`;
 
@@ -254,12 +286,6 @@ class Taptap {
     };
   }
 
-  /**
-   *
-   * @param {string} from
-   * @param {string} limit
-   * @returns
-   */
   async #requestReview(params) {
     const response = await fetch(
       `${this.#BASE_URL}/webapiv2/feeds/v1/app-ratings?` +
@@ -274,4 +300,31 @@ class Taptap {
   }
 }
 
-new Taptap("158451");
+new Taptap();
+
+// https://www.taptap.io/webapiv2/i/app-top/v2/hits?from=140&limit=10&platform=ios&type_name=hot
+// https://www.taptap.io/webapiv2/i/app-top/v2/hits?from=140&limit=10&platform=pc&type_name=hot
+
+// let i = 0;
+// while (true) {
+//   const requests = await fetch(
+//     "https://www.taptap.io/webapiv2/i/app-top/v2/hits?" +
+//       new URLSearchParams({
+//         from: i,
+//         limit: 20,
+//         platform: "android",
+//         type_name: "hot",
+//         "X-UA":
+//           "V=1&PN=WebAppIntl2&LANG=en_US&VN_CODE=114&VN=0.1.0&LOC=CN&PLT=PC&DS=Android&UID=4df88e5d-b4f4-4173-8985-a83672c5d35a&CURR=ID&DT=PC&OS=Linux&OSV=x86_64",
+//       })
+//   );
+
+//   const { data } = await requests.json();
+
+//   data.list.forEach(({ app }) => {
+//     console.log(app.id);
+//   });
+
+//   if (!data.next_page.length) break;
+//   i += 20;
+// }
