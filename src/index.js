@@ -1,8 +1,10 @@
 import fs from "fs-extra";
 import strftime from "strftime";
+import crypto from "crypto";
 
 class Taptap {
   #BASE_URL = "https://www.taptap.io";
+  #id_project = crypto.createHash("md5").update(this.#BASE_URL).digest("hex");
   #xua =
     "V=1&PN=WebAppIntl2&LANG=en_US&VN_CODE=114&VN=0.1.0&LOC=CN&PLT=PC&DS=Android&UID=4df88e5d-b4f4-4173-8985-a83672c5d35a&CURR=ID&DT=PC&OS=Linux&OSV=x86_64";
   #platforms = ["android", "ios", "pc"];
@@ -53,11 +55,15 @@ class Taptap {
     const link = `${this.#BASE_URL}/app/${app.id}`;
 
     const log = {
-      source: link,
+      Crawlling_time: strftime("%Y-%m-%d %H:%M:%S", new Date()),
+      id_project: this.#id_project,
+      project: "Data Intelegent",
+      source_name: app.title,
       total_data: 0,
-      total_data_berhasil_diproses: 0,
-      total_data_gagal_diproses: 0,
-      PIC: "romy",
+      total_success: 0,
+      total_failed: 0,
+      status: "Process",
+      assign: "romy",
     };
 
     console.log("try", app.title);
@@ -72,117 +78,132 @@ class Taptap {
 
       if (!reviews) break;
       log.total_data += reviews.length;
+      console.log(log);
 
-      await Promise.all(
-        reviews.forEach(async ({ post: postIn }) => {
-          const response = await fetch(
-            `${this.#BASE_URL}/webapiv2/creation/post/v1/detail?` +
-              new URLSearchParams({
-                id_str: postIn.id_str,
-                "X-UA": this.#xua,
-              })
-          );
+      // await Promise.all(
+      reviews.forEach(async ({ post: postIn }) => {
+        const response = await fetch(
+          `${this.#BASE_URL}/webapiv2/creation/post/v1/detail?` +
+            new URLSearchParams({
+              id_str: postIn.id_str,
+              "X-UA": this.#xua,
+            })
+        );
 
-          const { data } = await response.json();
-          const { post } = data;
-          const { user, id } = post;
+        const { data } = await response.json();
+        const { post } = data;
+        const { user, id } = post;
 
-          const username = user.name.replaceAll("/", "").replaceAll("\n", "");
-          const stat = !Object.keys(post.stat).length ? null : post.stat;
+        const username = user.name.replaceAll("/", "").replaceAll("\n", "");
+        const stat = !Object.keys(post.stat).length ? null : post.stat;
 
-          let rating;
-          try {
-            rating = postIn.list_fields.app_ratings
-              ? postIn.list_fields.app_ratings[app.id].score
-              : null;
-          } catch (e) {
-            rating =
-              postIn.list_fields.app_ratings[
-                Object.keys(postIn.list_fields.app_ratings)[0]
-              ].score;
-          }
+        let rating;
+        try {
+          rating = postIn.list_fields.app_ratings
+            ? postIn.list_fields.app_ratings[app.id].score
+            : null;
+        } catch (e) {
+          rating =
+            postIn.list_fields.app_ratings[
+              Object.keys(postIn.list_fields.app_ratings)[0]
+            ].score;
+        }
 
-          const outputFile = `data/${app.title}/${username}_${id}.json`;
-          try {
-            this.writeFile(outputFile, {
-              link,
-              domain: this.#BASE_URL.split("/")[2],
-              tag: `${this.#BASE_URL}/app/${app.id}`.split("/").slice(2),
-              crawling_time: strftime("%Y-%m-%d %H:%M:%S", new Date()),
-              crawling_time_epoch: Date.now(),
-              path_data_raw: `data/data_raw/data_review/www.taptap.io/${app.title}/json/${username}_${id}.json`,
-              path_data_clean: `data/data_clean/data_review/www.taptap.io/${app.title}/json/${username}_${id}.json`,
-              reviews_name: app.title,
-              description_reviews: app.description.text,
-              developers_reviews: app.developers.map(
-                (developer) => developer.name
+        const outputFile = `data/${app.title}/${username}_${id}.json`;
+        try {
+          this.writeFile(outputFile, {
+            link,
+            domain: this.#BASE_URL.split("/")[2],
+            tag: `${this.#BASE_URL}/app/${app.id}`.split("/").slice(2),
+            crawling_time: strftime("%Y-%m-%d %H:%M:%S", new Date()),
+            crawling_time_epoch: Date.now(),
+            path_data_raw: `data/data_raw/data_review/www.taptap.io/${app.title}/json/${username}_${id}.json`,
+            path_data_clean: `data/data_clean/data_review/www.taptap.io/${app.title}/json/${username}_${id}.json`,
+            reviews_name: app.title,
+            description_reviews: app.description.text,
+            developers_reviews: app.developers.map(
+              (developer) => developer.name
+            ),
+            tags_reviews: app.tags ? app.tags.map((tag) => tag.value) : null,
+            location_reviews: null,
+            category_reviews: "application",
+            total_reviews: app.stat.review_count,
+            total_fans: app.stat.fans_count,
+            total_user_want: app.stat.user_want_count,
+            total_user_played: app.stat.user_played_count,
+            total_user_playing: app.stat.user_playing_count,
+            reviews_rating: {
+              total_rating: parseFloat(app.stat.rating.score),
+              detail_total_rating: null,
+            },
+            review_info: app.stat.vote_info,
+            detail_reviews: {
+              username_reviews: username,
+              gender_reviews: user.gender.length ? user.gender : null,
+              avatar_reviews: user.avatar,
+              image_reviews: Object.keys(post.files.images),
+              created_time: strftime(
+                "%Y-%m-%d %H:%M:%S",
+                new Date(post.published_time * 1000)
               ),
-              tags_reviews: app.tags ? app.tags.map((tag) => tag.value) : null,
+              created_time_epoch: post.published_time,
+              edited_time: strftime(
+                "%Y-%m-%d %H:%M:%S",
+                new Date(post.edited_time * 1000)
+              ),
+              edited_time_epoch: post.edited_time,
+              email_reviews: null,
+              company_name: null,
               location_reviews: null,
-              category_reviews: "application",
-              total_reviews: app.stat.review_count,
-              total_fans: app.stat.fans_count,
-              total_user_want: app.stat.user_want_count,
-              total_user_played: app.stat.user_played_count,
-              total_user_playing: app.stat.user_playing_count,
-              reviews_rating: {
-                total_rating: parseFloat(app.stat.rating.score),
-                detail_total_rating: null,
-              },
-              review_info: app.stat.vote_info,
-              detail_reviews: {
-                username_reviews: username,
-                gender_reviews: user.gender.length ? user.gender : null,
-                avatar_reviews: user.avatar,
-                image_reviews: Object.keys(post.files.images),
-                created_time: strftime(
-                  "%Y-%m-%d %H:%M:%S",
-                  new Date(post.published_time * 1000)
-                ),
-                created_time_epoch: post.published_time,
-                edited_time: strftime(
-                  "%Y-%m-%d %H:%M:%S",
-                  new Date(post.edited_time * 1000)
-                ),
-                edited_time_epoch: post.edited_time,
-                email_reviews: null,
-                company_name: null,
-                location_reviews: null,
-                title_detail_reviews: post.title,
-                reviews_rating: rating,
-                detail_reviews_rating: null,
-                total_likes_reviews: stat ? stat.ups | 0 : 0,
-                total_dislikes_reviews: null,
-                total_reply_reviews: stat ? stat.comments | 0 : 0,
-                total_favorites_reviews: stat ? stat.favorites | 0 : 0,
-                content_reviews: post.contents.json
-                  .filter((content) => content.type == "paragraph")
-                  .map((content) =>
-                    content.children.map((e) => e.text).join("")
-                  )
-                  .filter((e) => e != "")
-                  .join("\n"),
-                reply_content_reviews: !(stat && stat.comments)
-                  ? []
-                  : await this.#getReplys({
-                      post_id_str: postIn.id_str,
-                    }),
+              title_detail_reviews: post.title,
+              reviews_rating: rating,
+              detail_reviews_rating: null,
+              total_likes_reviews: stat ? stat.ups | 0 : 0,
+              total_dislikes_reviews: null,
+              total_reply_reviews: stat ? stat.comments | 0 : 0,
+              total_favorites_reviews: stat ? stat.favorites | 0 : 0,
+              content_reviews: post.contents.json
+                .filter((content) => content.type == "paragraph")
+                .map((content) => content.children.map((e) => e.text).join(""))
+                .filter((e) => e != "")
+                .join("\n"),
+              reply_content_reviews: !(stat && stat.comments)
+                ? []
+                : await this.#getReplys({
+                    post_id_str: postIn.id_str,
+                  }),
 
-                date_of_experience: null,
-                date_of_experience_epoch: null,
-              },
-            });
-            log.total_data_berhasil_diproses += 1;
-            console.log(outputFile);
-          } catch (e) {
-            log.total_data_gagal_diproses += 1;
-          }
-        })
-      );
+              date_of_experience: null,
+              date_of_experience_epoch: null,
+            },
+          });
+          log.total_success += 1;
+          console.log(outputFile);
+        } catch (e) {
+          log.total_failed += 1;
+          await fs.appendFile(
+            "error.txt",
+            JSON.stringify({
+              crawling_time: strftime("%Y-%m-%d %H:%M:%S", new Date()),
+              id_project: this.#id_project,
+              project: "Data Intelegent",
+              source_name: app.title,
+              id: postIn.id_str,
+              process_name: "Crawling",
+              status: "error",
+              type_error: "ConnectionError",
+              detail_error: e,
+              assign: "romy",
+            }) + "\n"
+          );
+        }
+      });
+      // );
       i += 50;
     }
     console.log("success", app.title);
-    fs.appendFile("log.txt", JSON.stringify(log) + "\n");
+    log.status = "Done";
+    await fs.appendFile("info.txt", JSON.stringify(log) + "\n");
   }
 
   async writeFile(outputFile, data) {
@@ -304,30 +325,3 @@ class Taptap {
 }
 
 new Taptap();
-
-// https://www.taptap.io/webapiv2/i/app-top/v2/hits?from=140&limit=10&platform=ios&type_name=hot
-// https://www.taptap.io/webapiv2/i/app-top/v2/hits?from=140&limit=10&platform=pc&type_name=hot
-
-// let i = 0;
-// while (true) {
-//   const requests = await fetch(
-//     "https://www.taptap.io/webapiv2/i/app-top/v2/hits?" +
-//       new URLSearchParams({
-//         from: i,
-//         limit: 20,
-//         platform: "android",
-//         type_name: "hot",
-//         "X-UA":
-//           "V=1&PN=WebAppIntl2&LANG=en_US&VN_CODE=114&VN=0.1.0&LOC=CN&PLT=PC&DS=Android&UID=4df88e5d-b4f4-4173-8985-a83672c5d35a&CURR=ID&DT=PC&OS=Linux&OSV=x86_64",
-//       })
-//   );
-
-//   const { data } = await requests.json();
-
-//   data.list.forEach(({ app }) => {
-//     console.log(app.id);
-//   });
-
-//   if (!data.next_page.length) break;
-//   i += 20;
-// }
