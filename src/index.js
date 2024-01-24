@@ -2,6 +2,7 @@ import fs from "fs-extra";
 import strftime from "strftime";
 import crypto from "crypto";
 import { writeLog, updateLog, infoLog } from "./utils/logsio.js";
+import { ADDRGETNETWORKPARAMS } from "dns";
 class Taptap {
   #BASE_URL = "https://www.taptap.io";
   #id_project = crypto.createHash("md5").update(this.#BASE_URL).digest("hex");
@@ -184,12 +185,12 @@ class Taptap {
               },
             });
             log.total_success += 1;
-            await infoLog(this.#fileNameLog, log, postIn.id_str, "success");
-            // await updateLog(this.#fileNameLog, log);
+            infoLog(this.#fileNameLog, log, postIn.id_str, "success");
+            updateLog(this.#fileNameLog, log);
             console.log(outputFile);
           } catch (e) {
             log.total_failed += 1;
-            await infoLog(this.#fileNameLog, log, postIn.id_str, "error", e);
+            infoLog(this.#fileNameLog, log, postIn.id_str, "error", e);
           }
         })
       );
@@ -197,7 +198,7 @@ class Taptap {
     }
     console.log("success", app.title);
     log.status = "Done";
-    await updateLog(this.#fileNameLog, log);
+    updateLog(this.#fileNameLog, log);
   }
 
   async writeFile(outputFile, data) {
