@@ -116,7 +116,8 @@ class Taptap {
 
           const outputFile = `data/${app.title}/${username}_${id}.json`;
           try {
-            this.writeFile(outputFile, {
+            // this.writeFile(outputFile,
+            const datos = {
               link,
               domain: this.#BASE_URL.split("/")[2],
               tag: `${this.#BASE_URL}/app/${app.id}`.split("/").slice(2),
@@ -183,7 +184,8 @@ class Taptap {
                 date_of_experience: null,
                 date_of_experience_epoch: null,
               },
-            });
+            };
+            // );
             log.total_success += 1;
             infoLog(this.#fileNameLog, log, postIn.id_str, "success");
             updateLog(this.#fileNameLog, log);
