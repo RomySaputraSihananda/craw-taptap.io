@@ -6,13 +6,14 @@
   "type": "module",
   "scripts": {
     "start": "node src/.",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node src/utils/logsio"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "fs-extra": "^11.2.0",
+    "node-fetch": "^3.3.2",
     "strftime": "^0.10.2"
   }
 }
