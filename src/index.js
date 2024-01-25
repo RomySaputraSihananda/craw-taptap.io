@@ -3,6 +3,7 @@ import strftime from "strftime";
 import crypto from "crypto";
 import fetch from "node-fetch";
 import { writeLog, updateLog, infoLog } from "./utils/logsio.js";
+import { uploadS3Json } from "./utils/upload-s3.js";
 
 class Taptap {
   #BASE_URL = "https://www.taptap.io";
@@ -22,10 +23,10 @@ class Taptap {
       let i = 0;
       while (true) {
         const requests = await fetch(
-          "https://www.taptap.io/webapiv2/i/app-top/v2/hits?" +
+          `${this.#BASE_URL}/webapiv2/i/app-top/v2/hits?` +
             new URLSearchParams({
               from: i,
-              limit: 20,
+              limit: 5,
               platform,
               type_name: "hot",
               "X-UA": this.#xua,
@@ -34,14 +35,15 @@ class Taptap {
 
         const { data } = await requests.json();
 
-        for (const { app } of data.list) {
-          // data.list.forEach(async ({ app }) => {
-          await this.#process(app.id);
-          // });
-        }
+        await Promise.all(
+          data.list.map(async ({ app }) => {
+            await this.#process(app.id);
+          })
+        );
+        throw new Error("end");
 
         if (!data.next_page.length) break;
-        i += 20;
+        i += 5;
       }
     }
   }
@@ -82,6 +84,8 @@ class Taptap {
           detail_total_rating: null,
         },
         review_info: app.stat.vote_info,
+        path_data_raw: `S3://ai-pipeline-statistics/data/data_raw/data_review/taptap_io/${app.title}/json/detail.json`,
+        path_data_clean: `S3://ai-pipeline-statistics/data/data_clean/data_review/taptap_io/${app.title}/json/detail.json`,
       };
 
       const log = {
@@ -110,12 +114,15 @@ class Taptap {
           limit: 50,
         });
 
-        let outputFile = `data/${app.title}/detail.json`;
+        await Promise.all(
+          [
+            `data/data_raw/data_review/taptap_io/${app.title}/json/detail.json`,
+            `data/data_clean/data_review/taptap_io/${app.title}/json/detail.json`,
+          ].map(async (outputFile) => await uploadS3Json(outputFile, headers))
+        );
+        // await this.writeFile(outputFile, headers);
 
-        if (!reviews) {
-          await this.writeFile(outputFile, headers);
-          break;
-        }
+        if (!reviews) break;
 
         log.total_data += reviews.length;
 
@@ -148,12 +155,11 @@ class Taptap {
                 ].score;
             }
 
-            outputFile = `data/${app.title}/${username}_${id}.json`;
             try {
-              this.writeFile(outputFile, {
+              const data = {
                 ...headers,
-                path_data_raw: `data/data_raw/data_review/www.taptap.io/${app.title}/json/${username}_${id}.json`,
-                path_data_clean: `data/data_clean/data_review/www.taptap.io/${app.title}/json/${username}_${id}.json`,
+                path_data_raw: `S3://ai-pipeline-statistics/data/data_raw/data_review/taptap_io/${app.title}/json/data_review/${id}.json`,
+                path_data_clean: `S3://ai-pipeline-statistics/data/data_clean/data_review/taptap_io/${app.title}/json/data_review/${id}.json`,
                 detail_reviews: {
                   username_reviews: username,
                   gender_reviews: user.gender.length ? user.gender : null,
@@ -185,7 +191,7 @@ class Taptap {
                       content.children.map((e) => e.text).join("")
                     )
                     .filter((e) => e != "")
-                    .join("\n"),
+                    .join(" "),
                   reply_content_reviews: !(stat && stat.comments)
                     ? []
                     : await this.#getReplys({
@@ -195,14 +201,24 @@ class Taptap {
                   date_of_experience: null,
                   date_of_experience_epoch: null,
                 },
-              });
+              };
+              // this.writeFile(outputFile, data);
+              await Promise.all(
+                [
+                  `data/data_raw/data_review/taptap_io/${app.title}/json/data_review/${id}.json`,
+                  `data/data_raw/data_clean/taptap_io/${app.title}/json/data_review/${id}.json`,
+                ].map(async (outputFile) => {
+                  await uploadS3Json(outputFile, data);
+                  console.log(outputFile);
+                })
+              );
+
               log.total_success += 1;
               infoLog(log, postIn.id_str, "success");
               updateLog(log);
-              console.log(outputFile);
             } catch (e) {
               log.total_failed += 1;
-              infoLog(log, postIn.id_str, "error", e);
+              infoLog(log, postIn.id_str, "error", e, "Send to S3");
             }
           })
         );
@@ -212,7 +228,7 @@ class Taptap {
       log.status = "Done";
       updateLog(log);
     } catch (e) {
-      infoLog(log, postIn.id_str, "error", e);
+      console.log(e.message);
     }
   }
 
@@ -241,39 +257,40 @@ class Taptap {
       i += 10;
     }
 
-    const result = [];
-    for (const reply of replys) {
-      result.push({
-        username_reply_reviews: reply.user.name,
-        content_reply_reviews: reply.contents.raw_text,
-        image_reply_reviews: reply.images
-          ? reply.images.map((image) => image.url)
-          : null,
-        avatar_reply_reviews: reply.user.avatar,
-        gender_reply_reviews: reply.user.gender.length
-          ? reply.user.gender
-          : null,
-        total_likes_reviews: reply.stat.ups,
-        total_reply_reviews: reply.stat.comments,
-        created_time: strftime(
-          "%Y-%m-%d %H:%M:%S",
-          new Date(reply.created_time * 1000)
-        ),
-        created_time_epoch: reply.created_time,
-        edited_time: strftime(
-          "%Y-%m-%d %H:%M:%S",
-          new Date(reply.edited_time * 1000)
-        ),
-        edited_time_epoch: reply.edited_time,
-        child_comments: !reply.child_comments
-          ? null
-          : await this.#getChild({
-              id_str: reply.id,
-              limit: reply.stat.comments,
-            }),
-      });
-    }
-    return result;
+    // }
+    return await Promise.all(
+      replys.map(async (reply) => {
+        return {
+          username_reply_reviews: reply.user.name,
+          content_reply_reviews: reply.contents.raw_text,
+          image_reply_reviews: reply.images
+            ? reply.images.map((image) => image.url)
+            : null,
+          avatar_reply_reviews: reply.user.avatar,
+          gender_reply_reviews: reply.user.gender.length
+            ? reply.user.gender
+            : null,
+          total_likes_reviews: reply.stat.ups,
+          total_reply_reviews: reply.stat.comments,
+          created_time: strftime(
+            "%Y-%m-%d %H:%M:%S",
+            new Date(reply.created_time * 1000)
+          ),
+          created_time_epoch: reply.created_time,
+          edited_time: strftime(
+            "%Y-%m-%d %H:%M:%S",
+            new Date(reply.edited_time * 1000)
+          ),
+          edited_time_epoch: reply.edited_time,
+          child_comments: !reply.child_comments
+            ? null
+            : await this.#getChild({
+                id_str: reply.id,
+                limit: reply.stat.comments,
+              }),
+        };
+      })
+    );
   }
 
   async #getChild(payload) {
@@ -316,7 +333,6 @@ class Taptap {
         new Date(reply.edited_time * 1000)
       ),
       edited_time_epoch: reply.edited_time,
-      a: reply.child_comments,
     };
   }
 

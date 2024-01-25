@@ -6,12 +6,14 @@
   "type": "module",
   "scripts": {
     "start": "node src/.",
-    "test": "node src/utils/logsio"
+    "test": "node src/utils/upload-s3"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.499.0",
+    "aws-sdk": "^2.1543.0",
     "fs-extra": "^11.2.0",
     "node-fetch": "^3.3.2",
     "strftime": "^0.10.2"
