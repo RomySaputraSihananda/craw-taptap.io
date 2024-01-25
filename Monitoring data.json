@@ -1,0 +1,72 @@
+[
+  {
+    "Crawlling_time": "2024-01-25 23:58:13",
+    "id_project": null,
+    "project": "Data Intelligence",
+    "sub_project": "data review",
+    "source_name": "www.taptap.io",
+    "sub_source_name": "Call of Duty®: Warzone™ Mobile",
+    "id_sub_source": "232311",
+    "total_data": 2000,
+    "total_success": 1876,
+    "total_failed": 124,
+    "status": "Done",
+    "assign": "romy"
+  },
+  {
+    "Crawlling_time": "2024-01-25 23:58:13",
+    "id_project": null,
+    "project": "Data Intelligence",
+    "sub_project": "data review",
+    "source_name": "www.taptap.io",
+    "sub_source_name": "Dreamster world",
+    "id_sub_source": "33569984",
+    "total_data": 13,
+    "total_success": 13,
+    "total_failed": 0,
+    "status": "Done",
+    "assign": "romy"
+  },
+  {
+    "Crawlling_time": "2024-01-25 23:58:13",
+    "id_project": null,
+    "project": "Data Intelligence",
+    "sub_project": "data review",
+    "source_name": "www.taptap.io",
+    "sub_source_name": "Fortnite",
+    "id_sub_source": "82354",
+    "total_data": 1998,
+    "total_success": 1839,
+    "total_failed": 159,
+    "status": "Done",
+    "assign": "romy"
+  },
+  {
+    "Crawlling_time": "2024-01-25 23:58:13",
+    "id_project": null,
+    "project": "Data Intelligence",
+    "sub_project": "data review",
+    "source_name": "www.taptap.io",
+    "sub_source_name": "Rainbow Six Mobile",
+    "id_sub_source": "233287",
+    "total_data": 2000,
+    "total_success": 1844,
+    "total_failed": 156,
+    "status": "Done",
+    "assign": "romy"
+  },
+  {
+    "Crawlling_time": "2024-01-25 23:58:13",
+    "id_project": null,
+    "project": "Data Intelligence",
+    "sub_project": "data review",
+    "source_name": "www.taptap.io",
+    "sub_source_name": "Plants vs. Zombies™ 3",
+    "id_sub_source": "33657100",
+    "total_data": 202,
+    "total_success": 201,
+    "total_failed": 1,
+    "status": "Done",
+    "assign": "romy"
+  }
+]
