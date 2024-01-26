@@ -26,7 +26,7 @@ class Taptap {
           `${this.#BASE_URL}/webapiv2/i/app-top/v2/hits?` +
             new URLSearchParams({
               from: i,
-              limit: 5,
+              limit: 2,
               platform,
               type_name: "hot",
               "X-UA": this.#xua,
@@ -40,10 +40,11 @@ class Taptap {
             await this.#process(app.id);
           })
         );
+
         throw new Error("end");
 
         if (!data.next_page.length) break;
-        i += 5;
+        i += 2;
       }
     }
   }
@@ -206,7 +207,7 @@ class Taptap {
               await Promise.all(
                 [
                   `data/data_raw/data_review/taptap_io/${app.title}/json/data_review/${id}.json`,
-                  `data/data_raw/data_clean/taptap_io/${app.title}/json/data_review/${id}.json`,
+                  `data/data_clean/data_review/taptap_io/${app.title}/json/data_review/${id}.json`,
                 ].map(async (outputFile) => {
                   await uploadS3Json(outputFile, data);
                   console.log(outputFile);

@@ -3,12 +3,12 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const { ACCESS_KEY_ID, SECRET_ACCESS_KEY, ENDPOINT_URL } = process.env;
+const { S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_ENDPOINT_URL } = process.env;
 
 export const s3 = new AWS.S3({
-  accessKeyId: ACCESS_KEY_ID,
-  secretAccessKey: SECRET_ACCESS_KEY,
-  endpoint: ENDPOINT_URL,
+  accessKeyId: S3_ACCESS_KEY_ID,
+  secretAccessKey: S3_SECRET_ACCESS_KEY,
+  endpoint: S3_ENDPOINT_URL,
   s3ForcePathStyle: true,
 });
 
